@@ -72,6 +72,7 @@ def mux_audio(input_video, new_audio, output_video):
         '-map', '0:s?',
         '-c', 'copy',
         '-disposition:a:0', 'default',
+        '-max_interleave_delta', '0',
         output_video
     ]
     subprocess.run(mux_command)
