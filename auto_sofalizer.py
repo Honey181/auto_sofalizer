@@ -1,102 +1,89 @@
+import shutil
 import os
-import sys
+import glob
 import subprocess
 import re
 
-# Check if correct number of arguments are provided
-if len(sys.argv) != 4:
-    print("Usage: python main.py \"path/to/input/folder\" \"path/to/output/folder\" \"audio_track_number\"")
-    sys.exit(1)
+# Define the sofa_file name
+SOFA_FILE_NAME = 'irc_1003.sofa'
 
-input_folder = sys.argv[1]
-output_folder = sys.argv[2]
-audio_track_number = sys.argv[3]
+def run_command(command, log_file):
+    with open(log_file, 'a') as f:
+        f.write(f"Running command: {' '.join(command)}\n")
+    process = subprocess.Popen(command, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+    max_volume = None
+    with open(log_file, 'a') as f:
+        for line in iter(process.stdout.readline, b''):
+            line = line.decode('utf-8')
+            f.write(line)
+            match = re.search(r"max_volume: (-?\d+.\d+) dB", line)
+            if match:
+                max_volume = float(match.group(1))
+    process.stdout.close()
+    returncode = process.wait()
+    return max_volume, returncode
 
-# Create the output folder if it doesn't exist
-if not os.path.exists(output_folder):
-    os.makedirs(output_folder)
+def main(input_folder, output_folder, extensions, audio_track):
+    original_dir = os.getcwd()
+    script_dir = os.path.dirname(os.path.realpath(__file__))
+    sofa_file = os.path.join(script_dir, SOFA_FILE_NAME)
+    temp_folder = os.path.join(output_folder, 'temp')
+    log_file = os.path.join(temp_folder, 'log.txt')
+    os.makedirs(temp_folder, exist_ok=True)
+    os.chdir(temp_folder)
 
-# Function to extract max_volume from ffmpeg output
-def get_max_volume(input_file, audio_track_number):
-    command = [
-        'ffmpeg',
-        '-i', input_file,
-        '-map', '0:a:{}'.format(audio_track_number),
-        '-af', 'volumedetect',
-        '-vn',
-        '-f', 'null',
-        '-'
-    ]
-    result = subprocess.run(command, capture_output=True, text=True)
-    max_volume_matches = re.search(r"max_volume: ([\-\d\.]+) dB", result.stderr)
-    if max_volume_matches:
-        return float(max_volume_matches.group(1))
-    else:
-        return 0
+    # Copy the sofa_file to the temp_folder
+    shutil.copy(sofa_file, temp_folder)
+    sofa_file = SOFA_FILE_NAME
 
-# Function to demux the selected audio track from the video
-def demux_audio(input_video, output_audio, audio_track_number):
-    demux_command = [
-        'ffmpeg',
-        '-i', input_video,
-        '-map', '0:a:{}'.format(audio_track_number),
-        '-c:a', 'copy',
-        '-y', output_audio
-    ]
-    subprocess.run(demux_command)
+    for extension in extensions:
+        for file in glob.glob(f"{input_folder}/*.{extension}"):
+            filename = os.path.basename(file)
+            base = os.path.splitext(filename)[0]
+            output_file = f"{output_folder}/{base}(sofa).{extension}"
 
-# Function to process the audio with SOFA and gain
-def process_audio(input_audio, output_audio):
-    # Construct the ffmpeg command for processing with SOFA and gain adjustment
-    process_command = [
-        'ffmpeg',
-        '-i', input_audio,
-        '-filter_complex', '[0:a]sofalizer=sofa=irc_1003.sofa',
-        '-c:a', 'flac',
-        '-y', output_audio
-    ]
-    subprocess.run(process_command)
+            # Extract audio track
+            command = ['ffmpeg', '-i', file, '-map', f'0:{audio_track}', '-c:a', 'copy', f'{temp_folder}/{base}.mkv']
+            run_command(command, log_file)
 
-# Function to mux the new audio track into the video
-def mux_audio(input_video, new_audio, output_video):
-    mux_command = [
-        'ffmpeg',
-        '-i', input_video,
-        '-i', new_audio,
-        '-map', '1:a',
-        '-map', '0:v',
-        '-map', '0:a',
-        '-map', '0:s?',
-        '-c', 'copy',
-        '-disposition:a:0', 'default',
-        '-max_interleave_delta', '0',
-        output_video
-    ]
-    subprocess.run(mux_command)
+            # Process audio track with sofalizer filter
+            command = ['ffmpeg', '-i', f'{temp_folder}/{base}.mkv', '-af', f'sofalizer=sofa={sofa_file}', f'{temp_folder}/{base}_sofa.flac']
+            run_command(command, log_file)
 
-# Process each file in the input directory
-for filename in os.listdir(input_folder):
-    if filename.endswith(".mkv"):
-        # Construct the full paths for input and output files
-        input_file = os.path.join(input_folder, filename)
-        demuxed_audio_file = os.path.join(output_folder, filename.replace('.mkv', '.mka'))
-        processed_audio_file = os.path.join(output_folder, filename.replace('.mkv', '.flac'))
-        output_file = os.path.join(output_folder, filename.replace('.mkv', '(sofa).mkv'))
+            # Get max_volume
+            command = ['ffmpeg', '-i', f'{temp_folder}/{base}_sofa.flac', '-af', 'volumedetect', '-f', 'null', '/dev/null']
+            max_volume, returncode = run_command(command, log_file)
+            #print(f"Max volume: {max_volume} dB, Return code: {returncode}")
 
-        # Demux the selected audio track
-        demux_audio(input_file, demuxed_audio_file, audio_track_number)
+            # Add gain
+            command = ['ffmpeg', '-i', f'{temp_folder}/{base}_sofa.flac', '-af', f'volume={max_volume}', '-c:a', 'flac', f'{temp_folder}/{base}_gain.flac']
+            _, returncode = run_command(command, log_file)
 
-        # Process the audio with SOFA
-        process_audio(demuxed_audio_file, processed_audio_file)
+            # Mux the flac file
+            command = ['ffmpeg', '-i', file, '-i', f'{temp_folder}/{base}_gain.flac', '-map', '1:a', '-map', '0', '-c', 'copy', '-max_interleave_delta', '0', '-y', f'{temp_folder}/{base}_almost_done.{extension}']
+            run_command(command, log_file)
 
-        # Get the max_volume from the processed audio
-        max_volume = get_max_volume(processed_audio_file, audio_track_number)
+            # Remove default flag and add it to new track
+            command = ['ffmpeg', '-i', f'{temp_folder}/{base}_almost_done.{extension}', '-map', '0', '-c', 'copy', '-disposition:a', '0', '-y', output_file]
+            run_command(command, log_file)
 
-        # Process the audio with gain
-        processed_gain_audio_file = os.path.join(output_folder, filename.replace('.mkv', '_gain.flac'))
-        process_audio(processed_audio_file, processed_gain_audio_file)
+            # Unmark all audio tracks as default
+            command = ['ffmpeg', '-i', f'{temp_folder}/{base}_almost_done.{extension}', '-map', '0', '-c', 'copy', '-disposition:a', '0', '-y', f'{temp_folder}/{base}_unmarked.{extension}']
+            run_command(command, log_file)
 
-        # Mux the new audio track into the video
-        mux_audio(input_file, processed_gain_audio_file, output_file)
+            # Mark the first audio track as default
+            command = ['ffmpeg', '-i', f'{temp_folder}/{base}_unmarked.{extension}', '-map', '0', '-c', 'copy', '-disposition:a:0', 'default', '-y', output_file]
+            run_command(command, log_file)
 
-print("Processing complete.")
+    # Change the current working directory back to the original directory
+        os.chdir(original_dir)
+    # Ask user to remove temporary files
+    remove_files = input("Do you want to remove temporary files? (y): ")
+    if remove_files.lower() == 'y':
+        shutil.rmtree(temp_folder)
+    
+    print("Script is done.")
+
+if __name__ == "__main__":
+    import sys
+    main(sys.argv[1], sys.argv[2], sys.argv[3].split(','), int(sys.argv[4]))
