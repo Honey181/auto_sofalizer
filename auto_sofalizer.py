@@ -46,15 +46,12 @@ def demux_audio(input_video, output_audio, audio_track_number):
     subprocess.run(demux_command)
 
 # Function to process the audio with SOFA and gain
-def process_audio(input_audio, output_audio, max_volume):
-    # Calculate the adjustment needed (if max_volume is negative)
-    volume_adjustment = '+{}dB'.format(-max_volume) if max_volume < 0 else '+0dB'
-
+def process_audio(input_audio, output_audio):
     # Construct the ffmpeg command for processing with SOFA and gain adjustment
     process_command = [
         'ffmpeg',
         '-i', input_audio,
-        '-filter_complex', '[0:a]sofalizer=sofa=irc_1003.sofa[volume];[volume]volume={}'.format(volume_adjustment),
+        '-filter_complex', '[0:a]sofalizer=sofa=irc_1003.sofa',
         '-c:a', 'flac',
         '-y', output_audio
     ]
@@ -89,11 +86,14 @@ for filename in os.listdir(input_folder):
         # Demux the selected audio track
         demux_audio(input_file, demuxed_audio_file, audio_track_number)
 
-        # Get the max_volume from the first pass
-        max_volume = get_max_volume(demuxed_audio_file, audio_track_number)
+        # Process the audio with SOFA
+        process_audio(demuxed_audio_file, processed_audio_file)
 
-        # Process the audio with SOFA and gain
-        process_audio(demuxed_audio_file, processed_audio_file, max_volume)
+        # Get the max_volume from the processed audio
+        max_volume = get_max_volume(processed_audio_file, audio_track_number)
+
+        # Process the audio with gain
+        process_audio(processed_audio_file, processed_audio_file)
 
         # Mux the new audio track into the video
         mux_audio(input_file, processed_audio_file, output_file)
