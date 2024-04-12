@@ -65,8 +65,10 @@ def main(input_folder, output_folder, extensions, audio_track):
             max_volume, returncode = run_command(command, log_file)
             #print(f"Max volume: {max_volume} dB, Return code: {returncode}")
 
+            gain_db = f"{-max_volume}dB"
+            
             # Add gain
-            command = ['ffmpeg', '-v', ffmpeg_verbosity, '-i', f'{temp_folder}/{base}_sofa.flac', '-af', f'volume={max_volume}', '-c:a', 'flac', f'{temp_folder}/{base}_gain.flac']
+            command = ['ffmpeg', '-v', ffmpeg_verbosity, '-i', f'{temp_folder}/{base}_sofa.flac', '-af', f'volume={gain_db}', '-c:a', 'flac', f'{temp_folder}/{base}_gain.flac']
             _, returncode = run_command(command, log_file)
 
             # Mux the flac file
