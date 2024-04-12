@@ -86,7 +86,7 @@ def main(input_folder, output_folder, extensions, audio_track):
             run_command(command, log_file)
 
     # Change the current working directory back to the original directory
-        os.chdir(original_dir)
+    os.chdir(original_dir)
     # Ask user to remove temporary files
     remove_files = input("Do you want to remove temporary files? (y/N): ")
     if remove_files.lower() == 'y':
