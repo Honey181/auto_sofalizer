@@ -93,9 +93,10 @@ for filename in os.listdir(input_folder):
         max_volume = get_max_volume(processed_audio_file, audio_track_number)
 
         # Process the audio with gain
-        process_audio(processed_audio_file, processed_audio_file)
+        processed_gain_audio_file = os.path.join(output_folder, filename.replace('.mkv', '_gain.flac'))
+        process_audio(processed_audio_file, processed_gain_audio_file)
 
         # Mux the new audio track into the video
-        mux_audio(input_file, processed_audio_file, output_file)
+        mux_audio(input_file, processed_gain_audio_file, output_file)
 
 print("Processing complete.")
