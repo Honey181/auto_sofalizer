@@ -76,8 +76,8 @@ def main(input_folder, output_folder, extensions, audio_track):
             run_command(command, log_file)
 
             # Remove default flag and add it to new track
-            command = ['ffmpeg', '-v', ffmpeg_verbosity, '-i', f'{temp_folder}/{base}_almost_done.{extension}', '-map', '0', '-c', 'copy', '-disposition:a', '0', '-y', output_file]
-            run_command(command, log_file)
+            #command = ['ffmpeg', '-v', ffmpeg_verbosity, '-i', f'{temp_folder}/{base}_almost_done.{extension}', '-map', '0', '-c', 'copy', '-disposition:a', '0', '-y', output_file]
+            #run_command(command, log_file)
 
             # Unmark all audio tracks as default
             command = ['ffmpeg', '-v', ffmpeg_verbosity, '-i', f'{temp_folder}/{base}_almost_done.{extension}', '-map', '0', '-c', 'copy', '-disposition:a', '0', '-y', f'{temp_folder}/{base}_unmarked.{extension}']
@@ -86,6 +86,10 @@ def main(input_folder, output_folder, extensions, audio_track):
             # Mark the first audio track as default
             command = ['ffmpeg', '-v', ffmpeg_verbosity, '-i', f'{temp_folder}/{base}_unmarked.{extension}', '-map', '0', '-c', 'copy', '-disposition:a:0', 'default', '-y', output_file]
             run_command(command, log_file)
+            
+            for filename in os.listdir(temp_folder):
+                if filename.endswith(extension):
+            	    os.remove(os.path.join(temp_folder, filename))
 
     # Change the current working directory back to the original directory
     os.chdir(original_dir)
