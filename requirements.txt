@@ -1,0 +1,11 @@
+# Auto Sofalizer Requirements
+# Python 3.7+
+
+# Progress bar support (optional but recommended)
+tqdm>=4.65.0
+
+# Note: FFmpeg must be installed separately on your system
+# Windows: https://ffmpeg.org/download.html or winget install FFmpeg
+# macOS: brew install ffmpeg
+# Linux: sudo apt install ffmpeg (Debian/Ubuntu) or sudo dnf install ffmpeg (Fedora)
+
