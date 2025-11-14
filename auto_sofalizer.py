@@ -402,7 +402,7 @@ Examples:
     parser.add_argument(
         'audio_track',
         type=int,
-        help='Audio track number to process (0-indexed)'
+        help='Stream index of audio track (usually 1 for first audio, 2 for second, etc. Use ffprobe to check)'
     )
     
     parser.add_argument(

@@ -72,7 +72,7 @@ python auto_sofalizer.py INPUT_FOLDER OUTPUT_FOLDER EXTENSIONS AUDIO_TRACK
 - `INPUT_FOLDER`: Directory containing video files to process
 - `OUTPUT_FOLDER`: Directory where processed files will be saved
 - `EXTENSIONS`: File extensions to process (comma-separated)
-- `AUDIO_TRACK`: Audio track number to process (0-indexed)
+- `AUDIO_TRACK`: Stream index of audio track to process (usually `1` for first audio track, `2` for second, etc.)
 
 ### Examples
 
@@ -172,10 +172,20 @@ Error: SOFA file does not exist
 ```
 Error: Audio track X not found
 ```
-**Solution**: Use a tool like `ffprobe` to check available audio tracks:
+**Solution**: Use `ffprobe` to check available audio streams:
 ```bash
-ffprobe -i your_video.mkv
+ffprobe your_video.mkv 2>&1 | findstr "Stream"
 ```
+
+Look for the audio streams. Example:
+```
+Stream #0:0: Video       ← Stream 0 (don't use this!)
+Stream #0:1: Audio       ← Stream 1 (first audio - use 1)
+Stream #0:2: Audio       ← Stream 2 (second audio - use 2)
+Stream #0:3: Subtitle    ← Stream 3 (don't use this!)
+```
+
+**Important**: Count ALL streams (video + audio + subtitles), not just audio tracks!
 
 ### Permission errors
 **Solution**: Ensure you have write permissions for the output folder.
