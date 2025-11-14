@@ -190,6 +190,37 @@ class AudioProcessor:
         except Exception as e:
             raise FFmpegCommandError(f"Unexpected error running command: {e}")
     
+    def get_stream_info(self, input_file: Path, stream_index: int) -> dict:
+        """
+        Get information about a specific stream using ffprobe
+        
+        Args:
+            input_file: Path to input file
+            stream_index: Stream index to query
+            
+        Returns:
+            Dictionary with stream info
+        """
+        try:
+            result = subprocess.run(
+                ['ffprobe', '-v', 'quiet', '-select_streams', str(stream_index),
+                 '-show_entries', 'stream=codec_type,codec_name,channels,channel_layout,sample_rate:stream_tags=language,title',
+                 '-show_entries', 'stream_disposition=default',
+                 '-of', 'json', str(input_file)],
+                capture_output=True,
+                text=True,
+                check=True
+            )
+            
+            import json
+            data = json.loads(result.stdout)
+            if data.get('streams'):
+                return data['streams'][0]
+            return {}
+        except Exception as e:
+            logger.debug(f"Could not get stream info: {e}")
+            return {}
+    
     def process_file(self, input_file: Path) -> bool:
         """
         Process a single video file
@@ -215,6 +246,36 @@ class AudioProcessor:
                 logger.warning("Skipping... (delete the output file if you want to reprocess)")
                 self.stats['skipped'] += 1
                 return False
+            
+            # Get and display selected audio track info
+            stream_info = self.get_stream_info(input_file, self.config.audio_track)
+            if stream_info:
+                logger.info(f"Selected audio track (stream {self.config.audio_track}):")
+                
+                codec_type = stream_info.get('codec_type', 'unknown')
+                codec_name = stream_info.get('codec_name', 'unknown')
+                logger.info(f"  Type: {codec_type.upper()} ({codec_name.upper()})")
+                
+                if 'channels' in stream_info:
+                    channels = stream_info['channels']
+                    layout = stream_info.get('channel_layout', 'unknown')
+                    logger.info(f"  Channels: {channels} ({layout})")
+                
+                if 'sample_rate' in stream_info:
+                    sample_rate = int(stream_info['sample_rate']) / 1000
+                    logger.info(f"  Sample rate: {sample_rate} kHz")
+                
+                tags = stream_info.get('tags', {})
+                if 'language' in tags:
+                    logger.info(f"  Language: {tags['language']}")
+                if 'title' in tags:
+                    logger.info(f"  Title: {tags['title']}")
+                
+                disposition = stream_info.get('disposition', {})
+                if disposition.get('default') == 1:
+                    logger.info(f"  Default: Yes")
+                
+                logger.info("")  # Empty line for readability
             
             # Step 1: Extract audio track
             extracted_audio = self.temp_folder / f"{base}.mkv"
