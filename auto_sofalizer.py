@@ -121,7 +121,7 @@ class AudioProcessor:
         self.temp_folder.mkdir(parents=True, exist_ok=True)
         
         # Setup logging to file (now that temp folder exists)
-        self.file_handler = logging.FileHandler(self.log_file, mode='a')
+        self.file_handler = logging.FileHandler(self.log_file, mode='a', encoding='utf-8')
         self.file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
         logger.addHandler(self.file_handler)
         
@@ -282,17 +282,17 @@ class AudioProcessor:
                 if temp_file.is_file() and temp_file != output_file:
                     temp_file.unlink()
             
-            logger.info(f"✓ Successfully processed: {filename}")
+            logger.info(f"[SUCCESS] Successfully processed: {filename}")
             logger.info(f"  Output: {output_file}")
             self.stats['processed'] += 1
             return True
             
         except FFmpegCommandError as e:
-            logger.error(f"✗ Failed to process {input_file.name}: {e}")
+            logger.error(f"[FAILED] Failed to process {input_file.name}: {e}")
             self.stats['failed'] += 1
             return False
         except Exception as e:
-            logger.error(f"✗ Unexpected error processing {input_file.name}: {e}")
+            logger.error(f"[ERROR] Unexpected error processing {input_file.name}: {e}")
             self.stats['failed'] += 1
             return False
     
@@ -520,7 +520,7 @@ def main() -> int:
         processor.process_all()
         processor.cleanup()
         
-        logger.info("✓ All done!")
+        logger.info("All done!")
         return 0
         
     except KeyboardInterrupt:
