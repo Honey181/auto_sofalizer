@@ -1,4 +1,5 @@
 #!/usr/bin/env python3
+# -*- coding: utf-8 -*-
 """
 Auto Sofalizer - Automated SOFA-based spatial audio processing for video files
 
@@ -204,7 +205,7 @@ class AudioProcessor:
         try:
             result = subprocess.run(
                 ['ffprobe', '-v', 'quiet', '-select_streams', str(stream_index),
-                 '-show_entries', 'stream=codec_type,codec_name,channels,channel_layout,sample_rate:stream_tags=language,title',
+                 '-show_entries', 'stream=codec_type,codec_name,channels,channel_layout,sample_rate,bits_per_sample:stream_tags=language,title',
                  '-show_entries', 'stream_disposition=default',
                  '-of', 'json', str(input_file)],
                 capture_output=True,
@@ -247,33 +248,64 @@ class AudioProcessor:
                 self.stats['skipped'] += 1
                 return False
             
-            # Get and display selected audio track info
+            # Get and display selected stream info
             stream_info = self.get_stream_info(input_file, self.config.audio_track)
             if stream_info:
-                logger.info(f"Selected audio track (stream {self.config.audio_track}):")
+                codec_type = stream_info.get('codec_type', 'unknown').upper()
+                logger.info(f"Selected stream {self.config.audio_track} ({codec_type}):")
                 
-                codec_type = stream_info.get('codec_type', 'unknown')
+                # Warn if not an audio track
+                if codec_type != 'AUDIO':
+                    # Print warning in red
+                    RED = '\033[91m'
+                    RESET = '\033[0m'
+                    print(f"{RED}  WARNING: Stream {self.config.audio_track} is {codec_type}, not AUDIO!{RESET}")
+                    print(f"{RED}  This will likely fail. Use ffprobe to find the correct audio stream.{RESET}")
+                
+                # Codec
                 codec_name = stream_info.get('codec_name', 'unknown')
-                logger.info(f"  Type: {codec_type.upper()} ({codec_name.upper()})")
+                logger.info(f"  Codec: {codec_name.upper()}")
                 
-                if 'channels' in stream_info:
-                    channels = stream_info['channels']
-                    layout = stream_info.get('channel_layout', 'unknown')
-                    logger.info(f"  Channels: {channels} ({layout})")
+                # Type
+                logger.info(f"  Type: {codec_type}")
                 
-                if 'sample_rate' in stream_info:
-                    sample_rate = int(stream_info['sample_rate']) / 1000
-                    logger.info(f"  Sample rate: {sample_rate} kHz")
-                
+                # Language
                 tags = stream_info.get('tags', {})
                 if 'language' in tags:
                     logger.info(f"  Language: {tags['language']}")
-                if 'title' in tags:
-                    logger.info(f"  Title: {tags['title']}")
                 
+                # Name (Title)
+                if 'title' in tags:
+                    # Use print() for better UTF-8 handling in Windows Terminal
+                    import datetime
+                    timestamp = datetime.datetime.now().strftime('%Y-%m-%d %H:%M:%S,%f')[:-3]
+                    print(f"{timestamp} - INFO -   Name: {tags['title']}", flush=True)
+                
+                # Default
                 disposition = stream_info.get('disposition', {})
                 if disposition.get('default') == 1:
                     logger.info(f"  Default: Yes")
+                else:
+                    logger.info(f"  Default: No")
+                
+                # Properties (Hz, channels, bits per sample) - only show for audio
+                if codec_type == 'AUDIO':
+                    properties = []
+                    if 'sample_rate' in stream_info:
+                        sample_rate = int(stream_info['sample_rate'])
+                        properties.append(f"{sample_rate} Hz")
+                    if 'channels' in stream_info:
+                        channels = stream_info['channels']
+                        layout = stream_info.get('channel_layout', '')
+                        if layout:
+                            properties.append(f"{channels} channels ({layout})")
+                        else:
+                            properties.append(f"{channels} channels")
+                    if 'bits_per_sample' in stream_info and stream_info['bits_per_sample'] > 0:
+                        properties.append(f"{stream_info['bits_per_sample']} bits per sample")
+                    
+                    if properties:
+                        logger.info(f"  Properties: {', '.join(properties)}")
                 
                 logger.info("")  # Empty line for readability
             
