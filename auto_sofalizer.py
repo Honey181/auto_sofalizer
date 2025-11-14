@@ -89,11 +89,7 @@ class AudioProcessor:
             'failed': 0,
             'skipped': 0
         }
-        
-        # Setup logging to file
-        file_handler = logging.FileHandler(self.log_file, mode='a')
-        file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
-        logger.addHandler(file_handler)
+        self.file_handler = None  # Will be set up in setup_workspace()
     
     @staticmethod
     def check_ffmpeg() -> bool:
@@ -113,6 +109,9 @@ class AudioProcessor:
         """Setup the temporary workspace"""
         logger.info(f"Setting up workspace at: {self.temp_folder}")
         
+        # Create output folder if it doesn't exist
+        self.config.output_folder.mkdir(parents=True, exist_ok=True)
+        
         # Remove existing temp folder if it exists
         if self.temp_folder.exists():
             logger.warning(f"Removing existing temp folder: {self.temp_folder}")
@@ -121,8 +120,10 @@ class AudioProcessor:
         # Create temp folder
         self.temp_folder.mkdir(parents=True, exist_ok=True)
         
-        # Create output folder if it doesn't exist
-        self.config.output_folder.mkdir(parents=True, exist_ok=True)
+        # Setup logging to file (now that temp folder exists)
+        self.file_handler = logging.FileHandler(self.log_file, mode='a')
+        self.file_handler.setFormatter(logging.Formatter('%(asctime)s - %(levelname)s - %(message)s'))
+        logger.addHandler(self.file_handler)
         
         # Copy SOFA file to temp folder
         sofa_dest = self.temp_folder / self.config.sofa_file.name
