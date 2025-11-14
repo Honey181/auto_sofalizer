@@ -439,13 +439,19 @@ class AudioProcessor:
         
         try:
             if self.temp_folder.exists():
-                # Ask user for confirmation
-                response = input(f"\nRemove temporary files in {self.temp_folder}? [y/N]: ").strip().lower()
-                if response == 'y':
+                # Ask user for confirmation (Y is default)
+                response = input(f"\nRemove temporary files in {self.temp_folder}? [Y/n]: ").strip().lower()
+                if response == 'n':
+                    logger.info(f"Temporary files kept in: {self.temp_folder}")
+                else:
+                    # Close the log file handler before deleting
+                    if self.file_handler:
+                        self.file_handler.close()
+                        logger.removeHandler(self.file_handler)
+                        self.file_handler = None
+                    
                     shutil.rmtree(self.temp_folder)
                     logger.info("Temporary files removed")
-                else:
-                    logger.info(f"Temporary files kept in: {self.temp_folder}")
         except Exception as e:
             logger.error(f"Error cleaning up temporary files: {e}")
 
